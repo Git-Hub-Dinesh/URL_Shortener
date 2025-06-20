@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>All Shortened Links</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f9f9f9;
+      padding: 20px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+
+    th, td {
+      padding: 10px;
+      border: 1px solid #ddd;
+      text-align: center;
+    }
+
+    th {
+      background: #3498db;
+      color: white;
+    }
+
+    a {
+      color: #3498db;
+      text-decoration: none;
+    }
+
+    form {
+      display: inline;
+    }
+
+    button {
+      padding: 5px 10px;
+      background: #e74c3c;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #c0392b;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>📋 All Shortened Links</h2>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flash-message">
+        {% for category, msg in messages %}
+          <p style="color: green;">{{ msg }}</p>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <table>
+    <tr>
+      <th>Short URL</th>
+      <th>Long URL</th>
+      <th>Comment</th>
+      <th>Clicks</th>
+      <th>Action</th>
+    </tr>
+    {% for link in links %}
+<tr>
+  <td><a href="{{ url_for('redirect_url', short_url=link.short_url, _external=True) }}" target="_blank">{{ link.short_url }}</a></td>
+  <td style="word-break: break-all;">{{ link.long_url }}</td>
+  <td>{{ link.comment or '-' }}</td>
+  <td>{{ link.clicks }}</td>
+  <td>
+    <form method="post" action="{{ url_for('delete_link', short_url=link.short_url) }}">
+      <button type="submit">Delete</button>
+    </form>
+  </td>
+</tr>
+{% endfor %}
+
+  </table>
+
+  <br/>
+  <a href="{{ url_for('home') }}">← Back to Shortener</a>
+
+</body>
+</html>
