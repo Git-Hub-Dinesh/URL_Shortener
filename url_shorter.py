@@ -8,7 +8,7 @@ import re
 import os
 
 app = Flask(__name__)
-app.secret_key = "replace_with_a_strong_secret_key"
+app.secret_key = os.getenv('SECRET_KEY', 'your_default_secret_key')
 
 DB_CONFIG = {
     'host': os.getenv('DB_HOST'),
@@ -55,7 +55,7 @@ def signup():
 
         table_name = f"url_{username}"
         cursor.execute(f"""
-            CREATE TABLE {table_name} (
+            CREATE TABLE IF NOT EXISTS `{table_name}` (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 long_url TEXT NOT NULL,
                 short_url VARCHAR(10) UNIQUE NOT NULL,
@@ -107,7 +107,7 @@ def home():
     table_name = f"url_{session['username']}"
     conn = db_connection()
     cursor = conn.cursor()
-    cursor.execute(f"SELECT * FROM {table_name} ORDER BY id DESC")
+    cursor.execute(f"SELECT * FROM `{table_name}` ORDER BY id DESC")
     links = cursor.fetchall()
     conn.close()
 
@@ -129,7 +129,7 @@ def shorten_url():
     conn = db_connection()
     cursor = conn.cursor()
 
-    cursor.execute(f"SELECT short_url, clicks, comment FROM {table_name} WHERE long_url = %s", (long_url,))
+    cursor.execute(f"SELECT short_url, clicks, comment FROM `{table_name}` WHERE long_url = %s", (long_url,))
     existing = cursor.fetchone()
 
     if existing:
@@ -138,13 +138,13 @@ def shorten_url():
         comment_text = existing['comment']
     else:
         short = generate_short_url(long_url)
-        cursor.execute(f"INSERT INTO {table_name} (long_url, short_url, comment) VALUES (%s, %s, %s)",
+        cursor.execute(f"INSERT INTO `{table_name}` (long_url, short_url, comment) VALUES (%s, %s, %s)",
                        (long_url, short, comment))
         conn.commit()
         clicks = 0
         comment_text = comment
 
-    cursor.execute(f"SELECT * FROM {table_name} ORDER BY id DESC")
+    cursor.execute(f"SELECT * FROM `{table_name}` ORDER BY id DESC")
     links = cursor.fetchall()
     conn.close()
 
@@ -162,11 +162,11 @@ def redirect_url(short_url):
     table_name = f"url_{session['username']}"
     conn = db_connection()
     cursor = conn.cursor()
-    cursor.execute(f"SELECT long_url FROM {table_name} WHERE short_url = %s", (short_url,))
+    cursor.execute(f"SELECT long_url FROM `{table_name}` WHERE short_url = %s", (short_url,))
     entry = cursor.fetchone()
 
     if entry:
-        cursor.execute(f"UPDATE {table_name} SET clicks = clicks + 1 WHERE short_url = %s", (short_url,))
+        cursor.execute(f"UPDATE `{table_name}` SET clicks = clicks + 1 WHERE short_url = %s", (short_url,))
         conn.commit()
         conn.close()
         return redirect(entry['long_url'])
@@ -182,13 +182,12 @@ def delete_link(short_url):
     table_name = f"url_{session['username']}"
     conn = db_connection()
     cursor = conn.cursor()
-    cursor.execute(f"DELETE FROM {table_name} WHERE short_url = %s", (short_url,))
+    cursor.execute(f"DELETE FROM `{table_name}` WHERE short_url = %s", (short_url,))
     conn.commit()
     conn.close()
 
     flash("Link deleted.", "info")
     return redirect(url_for('home'))
-
 
 @app.route('/change_password', methods=['GET', 'POST'])
 def change_password():
@@ -202,15 +201,13 @@ def change_password():
 
         conn = db_connection()
         cursor = conn.cursor()
-
-        # Verify old password
-        cursor.execute("SELECT password FROM login WHERE username = %s", (session['username'],))
+        cursor.execute("SELECT password_hash FROM users WHERE username = %s", (session['username'],))
         user = cursor.fetchone()
 
-        if user and user['password'] == old_password:
-            # Update password
-            cursor.execute("UPDATE login SET password = %s WHERE username = %s",
-                           (new_password, session['username']))
+        if user and check_password_hash(user['password_hash'], old_password):
+            hashed_new_password = generate_password_hash(new_password)
+            cursor.execute("UPDATE users SET password_hash = %s WHERE username = %s",
+                           (hashed_new_password, session['username']))
             conn.commit()
             conn.close()
             flash("✅ Password changed successfully!", "success")
@@ -222,6 +219,11 @@ def change_password():
 
     return render_template('change_password.html')
 
-
 if __name__ == '__main__':
-    app.run(debug=True)
+    import sys
+    if 'RENDER' in os.environ:
+        # Render deploy
+        app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)))
+    else:
+        # Local dev
+        app.run(debug=True)
