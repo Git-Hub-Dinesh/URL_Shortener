@@ -5,15 +5,17 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import hashlib
 import base64
 import re
+import os
 
 app = Flask(__name__)
 app.secret_key = "replace_with_a_strong_secret_key"
 
 DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': '11031103',
-    'database': 'test'
+    'host': os.getenv('DB_HOST'),
+    'user': os.getenv('DB_USER'),
+    'password': os.getenv('DB_PASSWORD'),
+    'database': os.getenv('DB_NAME'),
+    'port': int(os.getenv('DB_PORT', 3306))
 }
 
 def db_connection():
